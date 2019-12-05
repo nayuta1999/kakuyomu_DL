@@ -1,3 +1,5 @@
-import narou_DL
-tmp = narou_DL.narou_DL("https://ncode.syosetu.com/n7782ci/1/")
-print(tmp.getURL())
+import kakuyomu_DL
+print("DLしたいカクヨムのURLを入力してください")
+url = input()
+tmp = kakuyomu_DL.kakuyomu_DL(url)
+print(tmp.save_text())
