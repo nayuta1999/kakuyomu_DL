@@ -2,6 +2,7 @@
 import requests
 import copy
 import pathlib
+import re
 
 
 class kakuyomu_DL():
@@ -50,35 +51,58 @@ class kakuyomu_DL():
         return result
 
     def scraiping_Contents(self):
+
         response = self.save_Contents()
         text = []
         text_data = []
+
         for string in response:
+            
             tmp = string.split("<p class=\"widget-episodeTitle js-vertical-composition-item\">")
+            column = 0
+
             tmp_title = tmp[1].split("</p>")
             title = tmp_title[0]
-            data = string.split("<p id=\"p")
+            
+            data = re.split("(<p id=\"p\d*\">)",string)
             data.pop(0)
-            for str_data in data:
-                s = str_data.split("\">")
-                t = s[1].split("</p>")
 
-                #テキストファイルにするとき削除する文字列
-                t[0] = t[0].replace("<br />","\n")
-                t[0] = t[0].replace("<em class=\"emphasisDots","")
-                t[0] = t[0].replace("<span>","")
-                t[0] = t[0].replace("</span>","")
-                t[0] = t[0].replace("</em>","")
-                t[0] = t[0].replace("<ruby><rb>","")
-                t[0] = t[0].replace("</rb><rp>","")
-                t[0] = t[0].replace("</rp><rt>","")
-                t[0] = t[0].replace("</rt><rp>","")
-                t[0] = t[0].replace("</rp></ruby>","")
-                text.append(t[0])
+            for str in data:
+
+                if(column % 2 == 1):
+
+                    s = str.split("</div>")
+                    replace_text = s[0]
+
+                    #ルビ用の置き換え
+                    replace_text = replace_text.replace("<ruby><rb>","\\ruby{")
+                    replace_text = replace_text.replace("</rb><rp>","}")
+                    replace_text = replace_text.replace("（</rp><rt>","{")
+                    replace_text = replace_text.replace("</rt><rp>）","}")
+                    replace_text = replace_text.replace("</rp></ruby>","")
+
+                    #傍点用の置き換え
+                    replace_text = replace_text.replace("<em class=\"emphasisDots\">","\\kenten[g]{")
+                    replace_text = replace_text.replace("<span>","")
+                    replace_text = replace_text.replace("</span>","")
+                    replace_text = replace_text.replace("</em>","}")
+                    
+                    #改行用の置き換え
+                    replace_text = replace_text.replace("</p>","\\\\")
+                    replace_text = replace_text.replace("<br />","")
+                    replace_text = re.sub("(<p id=\"p\d*\" class=\"blank\">)","\\\\\\\\",replace_text)
+                    
+                    text.append(replace_text)
+
+                column+=1
+                
+            column = 0
             result_text = copy.deepcopy("\n".join(text))
-            result_text = result_text.replace("\u3000","")
+            #いるかどうかわからんから現状コメントアウト中
+            #result_text = result_text.replace("\u3000","")            
             text_data.append({title:result_text})
             text = []
+            
         return text_data
 
     def save_text(self):
