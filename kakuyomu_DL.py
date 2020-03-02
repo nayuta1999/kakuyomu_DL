@@ -75,29 +75,29 @@ class kakuyomu_DL():
                     replace_text = s[0]
 
                     #ルビ用の置き換え
-                    replace_text = replace_text.replace("<ruby><rb>","\\ruby{")
-                    replace_text = replace_text.replace("</rb><rp>","}")
-                    replace_text = replace_text.replace("（</rp><rt>","{")
-                    replace_text = replace_text.replace("</rt><rp>）","}")
+                    replace_text = replace_text.replace("<ruby><rb>","")
+                    replace_text = replace_text.replace("</rb><rp>","")
+                    replace_text = replace_text.replace("</rp><rt>","")
+                    replace_text = replace_text.replace("</rt><rp>","")
                     replace_text = replace_text.replace("</rp></ruby>","")
 
                     #傍点用の置き換え
-                    replace_text = replace_text.replace("<em class=\"emphasisDots\">","\\kenten[g]{")
+                    replace_text = replace_text.replace("<em class=\"emphasisDots\">","")
                     replace_text = replace_text.replace("<span>","")
                     replace_text = replace_text.replace("</span>","")
-                    replace_text = replace_text.replace("</em>","}")
+                    replace_text = replace_text.replace("</em>","")
                     
                     #改行用の置き換え
-                    replace_text = replace_text.replace("</p>","\\\\")
+                    replace_text = replace_text.replace("</p>","")
                     replace_text = replace_text.replace("<br />","")
-                    replace_text = re.sub("(<p id=\"p\d*\" class=\"blank\">)","\\\\\\\\",replace_text)
+                    replace_text = re.sub("(<p id=\"p\d*\" class=\"blank\">)","",replace_text)
                     
                     text.append(replace_text)
 
                 column+=1
                 
             column = 0
-            result_text = copy.deepcopy("\n".join(text))
+            result_text = copy.deepcopy(" ".join(text))
             #いるかどうかわからんから現状コメントアウト中
             #result_text = result_text.replace("\u3000","")            
             text_data.append({title:result_text})
