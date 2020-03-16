@@ -98,8 +98,7 @@ class kakuyomu_DL():
                 
             column = 0
             result_text = copy.deepcopy(" ".join(text))
-            #いるかどうかわからんから現状コメントアウト中
-            #result_text = result_text.replace("\u3000","")            
+            result_text = result_text.replace("\u3000","")            
             text_data.append({title:result_text})
             text = []
             
