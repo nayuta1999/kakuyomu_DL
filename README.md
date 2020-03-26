@@ -3,7 +3,7 @@
 ## 使い方
 
 ```
-$python3 main.py
+$python3 kakuyomu_DL.py
 DLしたいカクヨムのURLを入力してください
 https://kakuyomu.jp/works/XXXXXXXXXXXXXX
 ```
