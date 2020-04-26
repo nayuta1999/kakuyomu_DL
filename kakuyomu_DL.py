@@ -1,93 +1,136 @@
-#coding:utf-8
+# coding:utf-8
+
 import requests
-import copy
 import pathlib
+import re
+from bs4 import BeautifulSoup
 
 
 class kakuyomu_DL():
-    url = ""
-    def __init__(self,url):
-        self.url = url
+    mainSoup = None
 
-    def getURL(self):
-        return self.url
+    # constructor : get mainpage html
+    def __init__(self, url):
+        res = requests.get(url)
 
-    def getContents(self):
-        response = requests.get(self.url)
-        if(response.status_code != requests.codes.ok):
-            print("無効なURLです")
+        if res.status_code == requests.codes.ok:
+            self.mainSoup = BeautifulSoup(res.text, "html.parser")
+
+            if not self.isWorks_main():
+                print("not works main page")
+                quit()
+
+            print("Title  : " + self.get_title())
+            print("Author : " + self.get_author())
+
+        else:
+            print("not exist")
             quit()
-        return response.text
 
-    def getTitle(self):
-        text = self.getContents()
-        tmp = text.split("<title>")
-        tmp = tmp[1].split("</title>")
-        return tmp[0]
+    # Determine if it is the main page or not
+    def isWorks_main(self):
+        if self.mainSoup.find(attrs={"data-route": "public:works:work"}) is not None:
+            return True
+        else:
+            return False
 
-    def host_url(self):
-        url = self.url
-        tmp = url.split("https://kakuyomu.jp/")
-        url = tmp[1]
-        return url
+    # get novel title
+    def get_title(self):
+        return self.mainSoup.find("h1", id="workTitle").getText()
 
-    def scraiping_url(self):
-        result_url = []
-        text = self.getContents()
-        result = text.split(self.host_url()+"/episodes/")
-        for i in range(1,len(result)):
-            tmp_url = result[i].split("\"")
-            result_url.append(tmp_url[0])
-        result_url.pop(0)
-        return result_url
+    # get novel author
+    def get_author(self):
+        return self.mainSoup.find("span", id="workAuthor-activityName").getText()
 
-    def save_Contents(self):
-        result = []
-        number = self.scraiping_url()
-        for i in number:
-            response = requests.get(self.url+"/episodes/"+i)
-            result.append(response.text)
-        return result
+    # get episode link hrefs list
+    def get_episodeLinks(self):
+        episodes_hrefs = []
+        links = [link for link in self.mainSoup.find_all(
+            "a", {"class", "widget-toc-episode-episodeTitle"})]
 
-    def scraiping_Contents(self):
-        response = self.save_Contents()
-        text = []
-        text_data = []
-        for string in response:
-            tmp = string.split("<p class=\"widget-episodeTitle js-vertical-composition-item\">")
-            tmp_title = tmp[1].split("</p>")
-            title = tmp_title[0]
-            data = string.split("<p id=\"p")
-            data.pop(0)
-            for str_data in data:
-                s = str_data.split("\">")
-                t = s[1].split("</p>")
+        for href in links:
+            episodes_hrefs.append("https://kakuyomu.jp" + href["href"])
 
-                #テキストファイルにするとき削除する文字列
-                t[0] = t[0].replace("<br />","\n")
-                t[0] = t[0].replace("<em class=\"emphasisDots","")
-                t[0] = t[0].replace("<span>","")
-                t[0] = t[0].replace("</span>","")
-                t[0] = t[0].replace("</em>","")
-                t[0] = t[0].replace("<ruby><rb>","")
-                t[0] = t[0].replace("</rb><rp>","")
-                t[0] = t[0].replace("</rp><rt>","")
-                t[0] = t[0].replace("</rt><rp>","")
-                t[0] = t[0].replace("</rp></ruby>","")
-                text.append(t[0])
-            result_text = copy.deepcopy("\n".join(text))
-            result_text = result_text.replace("\u3000","")
-            text_data.append({title:result_text})
-            text = []
-        return text_data
+        return episodes_hrefs
 
-    def save_text(self):
-        text = self.scraiping_Contents()
-        book = self.getTitle()
-        p = pathlib.Path("./kakuyomu/"+book)
-        if(p.exists() == False):
-            p.mkdir(parents=True)
-        for i in text:
-            for title in i.keys():
-                with open("./kakuyomu/"+book+"/"+title+".txt",'w') as f:
-                    f.write(i[title])
+    def get_episode(self, link):
+        contents_dict = {"chapter": "",
+                         "section": "", "title": "", "episode": ""}
+        soup = BeautifulSoup(requests.get(link).text, "html.parser")
+
+        chapter = soup.find(
+            "p", {"class", "chapterTitle level1 js-vertical-composition-item"})
+        section = soup.find(
+            "p", {"class", "chapterTitle level2 js-vertical-composition-item"})
+        if chapter is not None:
+            contents_dict["chapter"] = chapter.string
+        if section is not None:
+            contents_dict["section"] = section.string
+
+        contents_dict["title"] = soup.find(
+            "p", {"class", "widget-episodeTitle js-vertical-composition-item"}).string
+        contents_dict["episode"] = "\n".join([str(html.text) for html in soup.find_all(
+            "p", id=re.compile("\d+"))])
+
+        return contents_dict
+
+    # create a pdf file by creating and compiling a .tex file.
+
+    def set_novel(self):
+        default_pass = "./kakuyomu/" + self.get_title()
+        links = self.get_episodeLinks()
+        chapter = ""
+        section = ""
+
+        pathlib.Path(default_pass).mkdir(parents=True)
+        with open(default_pass + "/" + "output.log", "w") as f:
+            f.write("--- OUT PUT LOG ---\n")
+
+        for link in links:
+            episode_dict = self.get_episode(link)
+            save_pass = default_pass
+
+            if episode_dict["chapter"] != "":
+                chapter = "/" + episode_dict["chapter"]
+                section = ""
+                print("chapter : " + episode_dict["chapter"])
+                with open(default_pass + "/" + "output.log", "a") as f:
+                    f.write("chapter : " + episode_dict["chapter"] + "\n")
+            if episode_dict["section"] != "":
+                section = "/" + episode_dict["section"]
+                print("\tsection : " + episode_dict["section"])
+                with open(default_pass + "/" + "output.log", "a") as f:
+                    f.write("\tsection : " + episode_dict["section"] + "\n")
+
+            save_pass += chapter + section
+            path = pathlib.Path(save_pass)
+
+            if not path.exists():
+                path.mkdir(parents=True)
+
+            with open(save_pass + "/" + episode_dict["title"] + ".txt", "w") as f:
+                f.write(episode_dict["episode"])
+                print("\t\tepisode saved : " + episode_dict["title"])
+            with open(default_pass + "/" + "output.log", "a") as f:
+                f.write("\t\tepisode saved : " + episode_dict["title"] + "\n")
+
+
+if __name__ == "__main__":
+    # """
+    print("■■■■                                     ■                               ")
+    print("■                          ■■           ■■                               ")
+    print("■                          ■■           ■■■■■■    ■■■■■■■■        ■■     ")
+    print("■            ■             ■■■■■■      ■■   ■            ■        ■      ")
+    print("■            ■          ■■■■    ■     ■■    ■            ■        ■      ")
+    print("■            ■             ■    ■    ■■    ■■            ■       ■■  ■   ")
+    print("■            ■             ■   ■■          ■       ■■■■■■■       ■   ■   ")
+    print("■            ■             ■   ■■         ■■             ■       ■    ■  ")
+    print("■            ■            ■    ■■        ■■              ■      ■    ■■■ ")
+    print("             ■           ■■    ■        ■■        ■■■■■■■■    ■■■■■■■■ ■■")
+    print("             ■          ■■   ■■■       ■                                 ")
+    print("          ■■■■                                         ")
+    # """
+    print("Enter the URL of the main page of the work posted on kakuyomu.")
+    download_url = input()
+    novelData = kakuyomu_DL(download_url)
+    novelData.set_novel()
